@@ -1,0 +1,13 @@
+#/bin/sh
+set -ex
+#判断是否IP转为点，是修改KAFKA_CFG_ADVERTISED_LISTENERS值
+if [[ ${ENABLE_POINT_TO_UNDERLINE} == 1 && ${MY_POD_IP} ]]; then
+	env KAFKA_CFG_ADVERTISED_LISTENERS="PLAINTEXT://"${MY_POD_IP//./_}.${MY_CLUSTER_IN_DOMAIN_NAME}:${KAFKA_PORT_NUMBER}
+fi
+if [[ ${MY_POD_NAME#*-} ]]; then
+	evn KAFKA_CFG_BROKER_ID=$((${MY_POD_NAME#*-} + 1))
+fi
+echo "KAFKA_CFG_ADVERTISED_LISTENERS="${KAFKA_CFG_ADVERTISED_LISTENERS}
+echo "KAFKA_CFG_BROKER_ID="${KAFKA_CFG_BROKER_ID}
+#运行服务
+/opt/bitnami/scripts/kafka/run.sh

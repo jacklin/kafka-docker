@@ -1,44 +1,45 @@
-FROM azul/zulu-openjdk-alpine:8u292-8.54.0.21
+FROM docker.io/bitnami/minideb:bullseye
+LABEL maintainer "Bitnami <containers@bitnami.com>"
+LABEL modifier "Sniper <jacklin@shouyiren.net>"
 
-ARG kafka_version=2.7.0
-ARG scala_version=2.13
-ARG glibc_version=2.31-r0
-ARG vcs_ref=unspecified
-ARG build_date=unspecified
+ENV HOME="/" \
+    OS_ARCH="amd64" \
+    OS_FLAVOUR="debian-11" \
+    OS_NAME="linux" \
+    MY_ENABLE_POINT_TO_UNDERLINE=0 \
+    MY_POD_IP="" \
+    MY_POD_NAME="" \
+    MY_CLUSTER_IN_DOMAIN_NAME=".explame.com"
 
-LABEL org.label-schema.name="kafka" \
-      org.label-schema.description="Apache Kafka" \
-      org.label-schema.build-date="${build_date}" \
-      org.label-schema.vcs-url="https://github.com/wurstmeister/kafka-docker" \
-      org.label-schema.vcs-ref="${vcs_ref}" \
-      org.label-schema.version="${scala_version}_${kafka_version}" \
-      org.label-schema.schema-version="1.0" \
-      maintainer="wurstmeister"
+ARG JAVA_EXTRA_SECURITY_DIR="/bitnami/java/extra-security"
 
-ENV KAFKA_VERSION=$kafka_version \
-    SCALA_VERSION=$scala_version \
-    KAFKA_HOME=/opt/kafka \
-    GLIBC_VERSION=$glibc_version
+COPY prebuildfs /
 
-ENV PATH=${PATH}:${KAFKA_HOME}/bin
+RUN chmod 777 /usr/sbin/install_packages
+# Install required system packages and dependencies
+RUN install_packages acl ca-certificates curl gzip libc6 procps tar zlib1g net-tools iputils-ping procps telnet
+RUN . /opt/bitnami/scripts/libcomponent.sh && component_unpack "java" "11.0.15-150" --checksum fe6b65886a6b1f545508e272efbf422054ee030c867f94ebec2f93c5518252de
+RUN . /opt/bitnami/scripts/libcomponent.sh && component_unpack "gosu" "1.14.0-150" --checksum da4a2f759ccc57c100d795b71ab297f48b31c4dd7578d773d963bbd49c42bd7b
+RUN . /opt/bitnami/scripts/libcomponent.sh && component_unpack "wait-for-port" "1.0.3-150" --checksum 1013e2ebbe58e5dc8f3c79fc952f020fc5306ba48463803cacfbed7779173924
+RUN . /opt/bitnami/scripts/libcomponent.sh && component_unpack "render-template" "1.0.3-150" --checksum 8b992a5ee513c5eaca52b19232b21a93588ddf4c4850be4d47c6f19b11d1d90a
+RUN . /opt/bitnami/scripts/libcomponent.sh && component_unpack "kafka" "3.2.0-150" --checksum 7587d8d9ecf7d70b4601d512ef92d71c5a2d158f4cd5c9d4efebc2c3dccf1375
+RUN apt-get update && apt-get upgrade -y && \
+    rm -r /var/lib/apt/lists /var/cache/apt/archives
+RUN chmod 777 -R /opt/bitnami
+RUN ln -s /opt/bitnami/scripts/kafka/entrypoint.sh /entrypoint.sh
+RUN ln -s /opt/bitnami/scripts/kafka/run.sh /run.sh
 
-COPY download-kafka.sh start-kafka.sh broker-list.sh create-topics.sh versions.sh /tmp/
+COPY rootfs /
+RUN chmod 777 -R /opt/bitnami
+RUN /opt/bitnami/scripts/java/postunpack.sh
+RUN /opt/bitnami/scripts/kafka/postunpack.sh
+ENV APP_VERSION="3.2.0" \
+    BITNAMI_APP_NAME="kafka" \
+    JAVA_HOME="/opt/bitnami/java" \
+    PATH="/opt/bitnami/java/bin:/opt/bitnami/common/bin:/opt/bitnami/kafka/bin:$PATH"
 
-RUN apk add --no-cache bash curl jq docker \
- && chmod a+x /tmp/*.sh \
- && mv /tmp/start-kafka.sh /tmp/broker-list.sh /tmp/create-topics.sh /tmp/versions.sh /usr/bin \
- && sync && /tmp/download-kafka.sh \
- && tar xfz /tmp/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz -C /opt \
- && rm /tmp/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz \
- && ln -s /opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION} ${KAFKA_HOME} \
- && rm /tmp/* \
- && wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/${GLIBC_VERSION}/glibc-${GLIBC_VERSION}.apk \
- && apk add --no-cache --allow-untrusted glibc-${GLIBC_VERSION}.apk \
- && rm glibc-${GLIBC_VERSION}.apk
+EXPOSE 9092
 
-COPY overrides /opt/overrides
-
-VOLUME ["/kafka"]
-
-# Use "exec" form so that it runs as PID 1 (useful for graceful shutdown)
-CMD ["start-kafka.sh"]
+USER 1001
+ENTRYPOINT [ "/opt/bitnami/scripts/kafka/entrypoint.sh" ]
+CMD [ "/opt/bitnami/scripts/kafka/run.sh" ]
