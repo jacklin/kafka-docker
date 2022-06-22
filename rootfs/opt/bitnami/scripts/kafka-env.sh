@@ -126,8 +126,12 @@ export KAFKA_HEAP_OPTS="${KAFKA_HEAP_OPTS:--Xmx1024m -Xms1024m}"
 
 #针对k8s判断是否IP转为点，是修改KAFKA_CFG_ADVERTISED_LISTENERS值
 if [[ ${MY_ENABLE_POINT_TO_UNDERLINE} == 1 && ${MY_POD_IP} ]]; then
-    export KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://${MY_POD_IP//./_}${MY_CLUSTER_IN_DOMAIN_NAME:-}:${KAFKA_PORT_NUMBER:-9092}
+    export KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://${MY_POD_IP//./-}${MY_CLUSTER_IN_DOMAIN_NAME:-}:${KAFKA_PORT_NUMBER:-9092}
 fi
+echo ${MY_POD_NAME}
 if [[ ${MY_POD_NAME} ]]; then
-    export KAFKA_CFG_BROKER_ID=$((${MY_POD_NAME#*-} + 1))
+echo ${MY_POD_NAME##*-}
+pod_id=${MY_POD_NAME##*-}
+echo ${pod_id}
+    export KAFKA_CFG_BROKER_ID=$((${pod_id} + 1))
 fi
